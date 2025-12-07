@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User, Calendar, BarChart3, Settings, LogOut, Plus, Trash2, 
   MessageSquare, Image as ImageIcon, Send, Shield, Zap, 
@@ -8,7 +8,7 @@ import {
   HelpCircle, CheckCircle, XCircle
 } from 'lucide-react';
 
-// --- 1. ایمپورت‌های فایربیس ---
+// --- اتصال به فایربیس ---
 import { initializeApp } from "firebase/app";
 import { 
   getFirestore, collection, addDoc, getDocs, 
@@ -17,7 +17,7 @@ import {
 
 /**
  * ====================================================================
- * 
+ * 🔴 تنظیمات فایربیس (اینجا را با دقت پر کنید) 🔴
  * ====================================================================
  */
 const firebaseConfig = {
@@ -30,7 +30,7 @@ const firebaseConfig = {
   measurementId: "G-12KZ071LRV"
 };
 
-// راه‌اندازی فایربیس (با کنترل خطا برای جلوگیری از کرش کردن اگر کانفیگ نبود)
+// تلاش برای اتصال به فایربیس
 let dbRef = null;
 try {
   if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
@@ -44,11 +44,7 @@ try {
   console.error("خطا در اتصال فایربیس:", e);
 }
 
-/**
- * ====================================================================
- * ثابت‌ها و تنظیمات برنامه (بدون تغییر)
- * ====================================================================
- */
+// --- ثابت‌ها ---
 const APP_CONFIG = {
   ADMIN_DEFAULT: {
     username: "BehradB2",
@@ -124,7 +120,7 @@ const getDaysDiff = (dateStr) => Math.floor(Math.random() * 10) + 1;
 
 /**
  * ====================================================================
- * کامپوننت اصلی (NexusApp)
+ * کامپوننت اصلی (APP)
  * ====================================================================
  */
 export default function NexusApp() {
@@ -132,10 +128,8 @@ export default function NexusApp() {
   const [db, setDb] = useState(INITIAL_DATA);
   const [loading, setLoading] = useState(true);
 
-  // --- سیستم لود دیتا (ترکیبی: فایربیس + لوکال) ---
   useEffect(() => {
     const loadData = async () => {
-      // اگر فایربیس وصل بود، از آنجا بخوان
       if (dbRef) {
         try {
           const [usersSnap, gradesSnap, scheduleSnap, examsSnap, personalSnap, plansSnap] = await Promise.all([
@@ -148,8 +142,6 @@ export default function NexusApp() {
           ]);
           
           const format = (snap) => snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          
-          // ترکیب داده‌های فایربیس با ادمین پیش‌فرض
           const remoteUsers = format(usersSnap);
           const allUsers = remoteUsers.some(u => u.username === "BehradB2") ? remoteUsers : [...remoteUsers, { id: 1, ...APP_CONFIG.ADMIN_DEFAULT }];
 
@@ -160,14 +152,13 @@ export default function NexusApp() {
             exams: format(examsSnap),
             personalSchedule: format(personalSnap),
             aiPlans: format(plansSnap),
-            apiKey: localStorage.getItem("nexus_api_key") || "", // API Key از لوکال خوانده می‌شود (برای امنیت)
+            apiKey: localStorage.getItem("nexus_api_key") || "",
             notes: []
           });
         } catch (err) {
-          console.error("خطا در خواندن از فایربیس، سوییچ به لوکال", err);
+          console.error("خطا در فایربیس", err);
         }
       } else {
-        // حالت آفلاین (Local Storage)
         const savedData = localStorage.getItem('nexus_pro_final_db');
         if (savedData) setDb(JSON.parse(savedData));
       }
@@ -176,30 +167,27 @@ export default function NexusApp() {
     loadData();
   }, []);
 
-  // --- سیستم ذخیره دیتا (ترکیبی) ---
   useEffect(() => {
-    // همیشه در لوکال ذخیره کن (به عنوان بکاپ)
     localStorage.setItem('nexus_pro_final_db', JSON.stringify(db));
   }, [db]);
 
-  // تابع کمکی برای ذخیره در فایربیس (اگر وصل بود)
   const saveToCloud = async (collectionName, data) => {
     if (dbRef) {
       try {
         const docRef = await addDoc(collection(dbRef, collectionName), data);
-        return docRef.id; // برگرداندن آیدی واقعی فایربیس
+        return docRef.id;
       } catch (e) {
-        console.error("Cloud Save Error:", e);
+        console.error("Save Error", e);
       }
     }
-    return Date.now(); // آیدی موقت برای حالت آفلاین
+    return Date.now();
   };
 
   const deleteFromCloud = async (collectionName, id) => {
     if (dbRef) {
       try {
         await deleteDoc(doc(dbRef, collectionName, String(id)));
-      } catch (e) { console.error("Cloud Delete Error:", e); }
+      } catch (e) { console.error("Delete Error", e); }
     }
   };
 
@@ -212,23 +200,18 @@ export default function NexusApp() {
     return { success: false, message: "اطلاعات ورود نامعتبر است." };
   };
 
-  const handleLogout = () => setUser(null);
-
-  if (loading) return <div className="flex h-screen items-center justify-center bg-slate-950 text-cyan-500">در حال بارگذاری سیستم نکسوس...</div>;
-
+  if (loading) return <div className="flex h-screen items-center justify-center bg-slate-950 text-cyan-500">در حال بارگذاری نکسوس...</div>;
   if (!user) return <LoginPage onLogin={handleLogin} />;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-cyan-500 selection:text-white" dir="rtl">
+    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans" dir="rtl">
       <header className="bg-slate-900/80 backdrop-blur-md border-b border-cyan-500/20 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <Shield className="w-8 h-8 text-cyan-400" />
             <div>
               <h1 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">نکسوس</h1>
-              <p className="text-[10px] text-slate-400 uppercase tracking-widest">
-                {dbRef ? "وضعیت: آنلاین (Firebase)" : "وضعیت: آفلاین (Local)"}
-              </p>
+              <p className="text-[10px] text-slate-400 uppercase tracking-widest">{dbRef ? "آنلاین ☁️" : "آفلاین 💾"}</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -238,7 +221,7 @@ export default function NexusApp() {
                 {user.role === 'admin' ? 'مدیر کل' : `${user.classLevel} - ${user.branch}`}
               </span>
             </div>
-            <button onClick={handleLogout} className="p-2 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-all"><LogOut className="w-5 h-5" /></button>
+            <button onClick={() => setUser(null)} className="p-2 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-all"><LogOut className="w-5 h-5" /></button>
           </div>
         </div>
       </header>
@@ -253,7 +236,8 @@ export default function NexusApp() {
   );
 }
 
-// ... LoginPage ...
+// --- کامپوننت‌های فرعی ---
+
 function LoginPage({ onLogin }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -276,7 +260,6 @@ function LoginPage({ onLogin }) {
   );
 }
 
-// ... Admin Dashboard ...
 function AdminDashboard({ db, setDb, saveToCloud, deleteFromCloud }) {
   const [activeTab, setActiveTab] = useState('users');
   const tabs = [
@@ -291,7 +274,7 @@ function AdminDashboard({ db, setDb, saveToCloud, deleteFromCloud }) {
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
       <div className="lg:col-span-1 space-y-2">
         {tabs.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`w-full flex items-center gap-3 p-4 rounded-xl transition-all border ${activeTab === tab.id ? 'bg-cyan-500/10 border-cyan-500/50 text-cyan-400' : 'bg-slate-800/30 border-transparent text-slate-400 hover:bg-slate-800'}`}>
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`w-full flex items-center gap-3 p-4 rounded-xl border ${activeTab === tab.id ? 'bg-cyan-500/10 border-cyan-500 text-cyan-400' : 'bg-slate-800/30 border-transparent text-slate-400 hover:bg-slate-800'}`}>
             {tab.icon} <span className="font-medium">{tab.label}</span>
           </button>
         ))}
@@ -419,7 +402,6 @@ function AdminAIManager({ db }) {
 }
 
 function AdminAPISettings({ db, setDb }) {
-    // API Key در دیتابیس عمومی ذخیره نمی‌شود، فقط در لوکال
     const [key, setKey] = useState(db.apiKey);
     return (
       <div className="space-y-6">
@@ -452,11 +434,6 @@ function AdminGradeManager({ db, setDb, saveToCloud }) {
     );
 }
 
-/**
- * ====================================================================
- * پنل دانش‌آموز (Student Dashboard)
- * ====================================================================
- */
 function StudentDashboard({ db, setDb, currentUser, setUser, saveToCloud }) {
   const [activeTab, setActiveTab] = useState('study_plan');
   return (
@@ -488,18 +465,15 @@ function StudentDashboard({ db, setDb, currentUser, setUser, saveToCloud }) {
 function AIStudyPlanner({ currentUser, db, setDb, saveToCloud }) {
   const [generating, setGenerating] = useState(false);
   const myPlan = db.aiPlans.find(p => p.studentUsername === currentUser.username);
-
   const generatePlan = async () => {
     setGenerating(true);
     const myGrades = db.grades.filter(g => g.studentUsername === currentUser.username);
     const myPersonalEvents = db.personalSchedule.filter(s => s.studentUsername === currentUser.username);
     const myExams = db.exams.filter(e => e.classLevel === currentUser.classLevel);
-
     if (db.apiKey) {
       const promptContext = JSON.stringify({ grades: myGrades.map(g => ({subject: g.subject, score: g.score})), exams: myExams.map(e => ({subject: e.title, date: e.date})), busy_times: myPersonalEvents.map(p => ({day: p.day, time: p.time})) });
       const prompt = `یک برنامه مطالعاتی هفتگی دقیق بساز. خروجی فقط JSON باشد: [{ "day": "شنبه", "blocks": [{ "time": "...", "task": "...", "type": "study" }] }]`;
       const response = await callGeminiAPI(db.apiKey, prompt, `مشاور تحصیلی هوشمند. داده‌ها: ${promptContext}`);
-      
       if (response) {
         try {
           const newSchedule = JSON.parse(cleanJSON(response));
@@ -511,9 +485,7 @@ function AIStudyPlanner({ currentUser, db, setDb, saveToCloud }) {
         } catch (e) { console.error("JSON Error"); }
       }
     }
-    // Fallback Algorithm
     setTimeout(async () => {
-       // ... (Simple Algorithm Logic for backup) ...
        const newSchedule = WEEK_DAYS.map(day => ({ day, blocks: [{ time: "16:00 - 18:00", task: "مطالعه آزاد (الگوریتم آفلاین)", type: "study" }] }));
        const planData = { studentUsername: currentUser.username, schedule: newSchedule, dateCreated: new Date().toLocaleDateString('fa-IR') };
        const id = await saveToCloud("aiPlans", planData);
@@ -521,29 +493,10 @@ function AIStudyPlanner({ currentUser, db, setDb, saveToCloud }) {
        setGenerating(false);
     }, 1500);
   };
-
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center border-b border-slate-700 pb-4">
-        <div><h3 className="text-xl font-bold text-orange-400 flex items-center gap-2"><Target/> برنامه‌ریز هوشمند نکسوس</h3><p className="text-slate-400 text-sm mt-1">تولید برنامه درسی شخصی‌سازی شده با Gemini.</p></div>
-        <button onClick={generatePlan} disabled={generating} className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-2 rounded-xl flex items-center gap-2"> {generating ? <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div> : <Cpu className="w-5 h-5"/>} {myPlan ? 'تولید مجدد' : 'ساخت برنامه'} </button>
-      </div>
-      {myPlan ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
-          {myPlan.schedule.map((dayPlan, idx) => (
-            <div key={idx} className="bg-slate-800 border border-slate-700 rounded-xl p-4">
-              <h4 className="text-center font-bold text-orange-400 border-b border-slate-700 pb-2 mb-3">{dayPlan.day}</h4>
-              <div className="space-y-2">
-                {dayPlan.blocks.map((block, bIdx) => (
-                  <div key={bIdx} className="p-3 rounded border text-sm bg-slate-900/50 border-slate-700/50 text-slate-200">
-                    <span className="text-xs opacity-70 font-mono mb-1">{block.time}</span><span className="font-medium block">{block.task}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : !generating && <div className="text-center text-slate-500 py-10">هنوز برنامه‌ای ساخته نشده است.</div>}
+      <div className="flex justify-between items-center border-b border-slate-700 pb-4"><div><h3 className="text-xl font-bold text-orange-400 flex items-center gap-2"><Target/> برنامه‌ریز هوشمند نکسوس</h3><p className="text-slate-400 text-sm mt-1">تولید برنامه درسی شخصی‌سازی شده با Gemini.</p></div><button onClick={generatePlan} disabled={generating} className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-2 rounded-xl flex items-center gap-2"> {generating ? <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div> : <Cpu className="w-5 h-5"/>} {myPlan ? 'تولید مجدد' : 'ساخت برنامه'} </button></div>
+      {myPlan ? (<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">{myPlan.schedule.map((dayPlan, idx) => (<div key={idx} className="bg-slate-800 border border-slate-700 rounded-xl p-4"><h4 className="text-center font-bold text-orange-400 border-b border-slate-700 pb-2 mb-3">{dayPlan.day}</h4><div className="space-y-2">{dayPlan.blocks.map((block, bIdx) => (<div key={bIdx} className="p-3 rounded border text-sm bg-slate-900/50 border-slate-700/50 text-slate-200"><span className="text-xs opacity-70 font-mono mb-1">{block.time}</span><span className="font-medium block">{block.task}</span></div>))}</div></div>))}</div>) : !generating && <div className="text-center text-slate-500 py-10">هنوز برنامه‌ای ساخته نشده است.</div>}
     </div>
   );
 }
@@ -554,7 +507,6 @@ function StudentSmartQuiz({ currentUser, db }) {
   const [quiz, setQuiz] = useState(null);
   const [answers, setAnswers] = useState({});
   const [result, setResult] = useState(null);
-
   const generateQuiz = async () => {
     if (!db.apiKey) return alert("برای ساخت آزمون، API Key نیاز است.");
     setLoading(true); setQuiz(null); setResult(null); setAnswers({});
